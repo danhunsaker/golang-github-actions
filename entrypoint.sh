@@ -32,8 +32,7 @@ send_comment() {
 # mod_download is getting go modules using go.mod.
 mod_download() {
 	# setup go private modules
-	if [[ ! -z "$GO_MOD_GOPRIVATE" ]]; then
-		# todo: check if this is correct way of passing in variables
+	if [ "${GO_MOD_GOPRIVATE}" != "" ]; then
 		git config --global url."https://${GO_MOD_GH_USERNAME}:${GO_MOD_GH_TOKEN}@github.com".insteadOf "git@github.com" &
   		git config --global url."https://${GO_MOD_GH_USERNAME}:${GO_MOD_GH_TOKEN}@github.com".insteadOf "https://github.com" |
 		go env -w GOPRIVATE="${GO_MOD_GOPRIVATE}"
