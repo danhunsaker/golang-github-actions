@@ -32,7 +32,7 @@ send_comment() {
 setup_private_repo_access() {
 	# setup go private modules
 	if [ "${GO_MOD_GOPRIVATE}" != "" ]; then
-		rm /github/home/.gitconfig.lock # try removing this in case
+		rm -f /github/home/.gitconfig.lock || true # try removing this in case, dont error if
 		git config --global url."https://${GO_MOD_GH_USERNAME}:${GO_MOD_GH_TOKEN}@github.com".insteadOf "git@github.com" &
   		git config --global url."https://${GO_MOD_GH_USERNAME}:${GO_MOD_GH_TOKEN}@github.com".insteadOf "https://github.com" |
 		go env -w GOPRIVATE="${GO_MOD_GOPRIVATE}"
