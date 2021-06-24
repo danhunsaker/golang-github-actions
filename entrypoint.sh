@@ -29,16 +29,24 @@ send_comment() {
 	curl -s -S -H "Authorization: token ${GITHUB_TOKEN}" --header "Content-Type: application/json" --data "${PAYLOAD}" "${COMMENTS_URL}" > /dev/null
 }
 
-# mod_download is getting go modules using go.mod.
-mod_download() {
+setup_private_repo_access() {
 	# setup go private modules
 	if [ "${GO_MOD_GOPRIVATE}" != "" ]; then
+		rm /github/home/.gitconfig.lock # try removing this in case
 		git config --global url."https://${GO_MOD_GH_USERNAME}:${GO_MOD_GH_TOKEN}@github.com".insteadOf "git@github.com" &
   		git config --global url."https://${GO_MOD_GH_USERNAME}:${GO_MOD_GH_TOKEN}@github.com".insteadOf "https://github.com" |
 		go env -w GOPRIVATE="${GO_MOD_GOPRIVATE}"
-		echo "Setup go private repos for: ${GO_MOD_GOPRIVATE}"
+		# check result status and report back
+		if [[ $? != 0 ]]; then
+  			printf "\t\033[31mSetup go private repos for: ${GO_MOD_GOPRIVATE} \033[0m \033[0;30m\033[41mFAILURE!\033[0m\n"
+		else
+  			printf "\t\033[32mSetup go private repos for: ${GO_MOD_GOPRIVATE} \033[0m \033[0;30m\033[42mpass\033[0m\n"
+		fi
 	fi
+}
 
+# mod_download is getting go modules using go.mod.
+mod_download() {
 	if [ ! -e go.mod ]; then go mod init; fi
 	go mod download
 	if [ $? -ne 0 ]; then exit 1; fi
@@ -252,6 +260,8 @@ ${OUTPUT}
 # ------------------------
 #  Main Flow
 # ------------------------
+setup_private_repo_access
+
 cd ${GITHUB_WORKSPACE}/${WORKING_DIR}
 
 case ${RUN} in
