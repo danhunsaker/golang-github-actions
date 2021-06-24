@@ -25,6 +25,18 @@ inputs:
     description: "if this is true, do not detect 'defer' with error. This is only valid when run is errcheck."
     default: false
     required: false
+  go-mod-gh-username:
+    description: "github username for go dependencies from private repos. Must match the account token generated under"
+    default: ""
+    required: false
+  go-mod-gh-token:
+    description: "github personal access token for go dependencies from private repos. Must match username account"
+    default: ""
+    required: false
+  go-mod-goprivate:
+    description: "git private organization url. eg. github.com/my-org"
+    default: ""
+    required: false
 runs:
   using: "docker"
   image: "Dockerfile"
@@ -35,6 +47,9 @@ runs:
     - ${{ inputs.token }}
     - ${{ inputs.flags }}
     - ${{ inputs.ignore-defer }}
+    - ${{ inputs.go-mod-gh-username }}
+    - ${{ inputs.go-mod-gh-token }}
+    - ${{ inputs.go-mod-goprivate }}
 branding:
   icon: "alert-triangle"
   color: "yellow"

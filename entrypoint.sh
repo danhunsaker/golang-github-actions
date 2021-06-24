@@ -10,6 +10,9 @@ SEND_COMMNET=$3
 GITHUB_TOKEN=$4
 FLAGS=$5
 IGNORE_DEFER_ERR=$6
+GO_MOD_GH_USERNAME=$7
+GO_MOD_GH_TOKEN=$8
+GO_MOD_GOPRIVATE=$9
 
 COMMENT=""
 SUCCESS=0
@@ -28,6 +31,15 @@ send_comment() {
 
 # mod_download is getting go modules using go.mod.
 mod_download() {
+	# setup go private modules
+	if [[ ! -z "$GO_MOD_GOPRIVATE" ]]; then
+		# todo: check if this is correct way of passing in variables
+		git config --global url."https://${GO_MOD_GH_USERNAME}:${GO_MOD_GH_TOKEN}@github.com".insteadOf "git@github.com" &
+  		git config --global url."https://${GO_MOD_GH_USERNAME}:${GO_MOD_GH_TOKEN}@github.com".insteadOf "https://github.com" |
+		go env -w GOPRIVATE="${GO_MOD_GOPRIVATE}"
+		echo "Setup go private repos for: ${GO_MOD_GOPRIVATE}"
+	fi
+
 	if [ ! -e go.mod ]; then go mod init; fi
 	go mod download
 	if [ $? -ne 0 ]; then exit 1; fi
