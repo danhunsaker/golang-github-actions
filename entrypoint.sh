@@ -30,11 +30,13 @@ send_comment() {
 }
 
 setup_private_repo_access() {
-	# setup go private modules. another solution is to use .netrc file if this keeps giving problems
+	# setup access to go private modules via .netrc file
 	if [ "${GO_MOD_GOPRIVATE}" != "" ]; then
-		rm -f /github/home/.gitconfig.lock || true # try removing this in case, dont error if
-		git config --global url."https://${GO_MOD_GH_USERNAME}:${GO_MOD_GH_TOKEN}@github.com".insteadOf "git@github.com" &
-  		git config --global url."https://${GO_MOD_GH_USERNAME}:${GO_MOD_GH_TOKEN}@github.com".insteadOf "https://github.com" |
+cat << EOF > .netrc
+machine github.com
+  login $GO_MOD_GH_USERNAME
+  password $GO_MOD_GH_TOKEN
+EOF	
 		go env -w GOPRIVATE="${GO_MOD_GOPRIVATE}"
 		# check result status and report back
 		if [ $? != 0 ]; then
