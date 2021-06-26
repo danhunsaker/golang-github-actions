@@ -262,9 +262,9 @@ ${OUTPUT}
 # ------------------------
 #  Main Flow
 # ------------------------
-setup_private_repo_access
-
 cd ${GITHUB_WORKSPACE}/${WORKING_DIR}
+
+setup_private_repo_access
 
 case ${RUN} in
 	"errcheck" )
