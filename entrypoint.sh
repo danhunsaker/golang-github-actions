@@ -30,14 +30,8 @@ send_comment() {
 }
 
 setup_private_repo_access() {
-	# setup access to go private modules via .netrc file
-	if [ "${GO_MOD_GOPRIVATE}" != "" ]; then
-		cat << EOF > .netrc
-machine github.com
-  login $GO_MOD_GH_USERNAME
-  password $GO_MOD_GH_TOKEN
-EOF
-	
+		git config --global "url.ssh://git@$GO_MOD_GOPRIVATE/.insteadOf" "https://$GO_MOD_GOPRIVATE/"
+
 		go env -w GOPRIVATE="${GO_MOD_GOPRIVATE}"
 		# check result status and report back
 		if [ $? != 0 ]; then
