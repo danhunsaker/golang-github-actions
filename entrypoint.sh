@@ -30,15 +30,14 @@ send_comment() {
 }
 
 setup_private_repo_access() {
-		git config --global "url.ssh://git@$GO_MOD_GOPRIVATE/.insteadOf" "https://$GO_MOD_GOPRIVATE/"
+	git config --global "url.ssh://git@$GO_MOD_GOPRIVATE/.insteadOf" "https://$GO_MOD_GOPRIVATE/"
 
-		go env -w GOPRIVATE="${GO_MOD_GOPRIVATE}"
-		# check result status and report back
-		if [ $? != 0 ]; then
-  			printf "\t\033[31mSetup go private repos for: ${GO_MOD_GOPRIVATE} \033[0m \033[0;30m\033[41mFAILURE!\033[0m\n"
-		else
-  			printf "\t\033[32mSetup go private repos for: ${GO_MOD_GOPRIVATE} \033[0m \033[0;30m\033[42mpass\033[0m\n"
-		fi
+	go env -w GOPRIVATE="${GO_MOD_GOPRIVATE}"
+	# check result status and report back
+	if [ $? != 0 ]; then
+			printf "\t\033[31mSetup go private repos for: ${GO_MOD_GOPRIVATE} \033[0m \033[0;30m\033[41mFAILURE!\033[0m\n"
+	else
+			printf "\t\033[32mSetup go private repos for: ${GO_MOD_GOPRIVATE} \033[0m \033[0;30m\033[42mpass\033[0m\n"
 	fi
 }
 
