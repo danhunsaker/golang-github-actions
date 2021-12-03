@@ -40,12 +40,13 @@ machine github.com
   password $GO_MOD_GH_TOKEN
 EOF
 
-	go env -w GOPRIVATE="${GO_MOD_GOPRIVATE}"
-	# check result status and report back
-	if [ $? != 0 ]; then
-			printf "\t\033[31mSetup go private repos for: ${GO_MOD_GOPRIVATE} \033[0m \033[0;30m\033[41mFAILURE!\033[0m\n"
-	else
-			printf "\t\033[32mSetup go private repos for: ${GO_MOD_GOPRIVATE} \033[0m \033[0;30m\033[42mpass\033[0m\n"
+		go env -w GOPRIVATE="${GO_MOD_GOPRIVATE}"
+		# check result status and report back
+		if [ $? != 0 ]; then
+				printf "\t\033[31mSetup go private repos for: ${GO_MOD_GOPRIVATE} \033[0m \033[0;30m\033[41mFAILURE!\033[0m\n"
+		else
+				printf "\t\033[32mSetup go private repos for: ${GO_MOD_GOPRIVATE} \033[0m \033[0;30m\033[42mpass\033[0m\n"
+		fi
 	fi
 }
 
