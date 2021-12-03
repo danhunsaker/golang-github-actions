@@ -260,7 +260,7 @@ ${OUTPUT}
 # ------------------------
 cd ${GITHUB_WORKSPACE}/${WORKING_DIR}
 
-setup_private_repo_access
+# setup_private_repo_access
 
 case ${RUN} in
 	"errcheck" )
