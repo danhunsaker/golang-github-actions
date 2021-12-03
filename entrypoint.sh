@@ -14,6 +14,8 @@ GO_MOD_GH_USERNAME=$7
 GO_MOD_GH_TOKEN=$8
 GO_MOD_GOPRIVATE=$9
 
+MODULE_NAME="${WORKING_DIR/.\//""}"
+
 COMMENT=""
 SUCCESS=0
 
@@ -65,7 +67,7 @@ check_errcheck() {
 	fi
 
 	if [ "${SEND_COMMNET}" = "true" ]; then
-		COMMENT="## ⚠ $WORKING_DIR errcheck Failed
+		COMMENT="## ⚠ errcheck failed ($MODULE_NAME)
 \`\`\`
 ${OUTPUT}
 \`\`\`
@@ -99,7 +101,7 @@ ${FILE_DIFF}
 
 "
 		done
-		COMMENT="## ⚠ $WORKING_DIR gofmt Failed
+		COMMENT="## ⚠ gofmt failed ($MODULE_NAME)
 ${FMT_OUTPUT}
 "
 	fi
@@ -131,7 +133,7 @@ ${FILE_DIFF}
 
 "
 		done
-		COMMENT="## ⚠ $WORKING_DIR goimports Failed
+		COMMENT="## ⚠ goimports failed ($MODULE_NAME)
 ${FMT_OUTPUT}
 "
 	fi
@@ -150,7 +152,7 @@ check_lint() {
 	fi
 
 	if [ "${SEND_COMMNET}" = "true" ]; then
-		COMMENT="## ⚠ $WORKING_DIR golint Failed
+		COMMENT="## ⚠ golint failed ($MODULE_NAME)
 $(echo "${OUTPUT}" | awk 'END{print}')
 <details><summary>Show Detail</summary>
 
@@ -174,7 +176,7 @@ check_sec() {
 	fi
 
 	if [ "${SEND_COMMNET}" = "true" ]; then
-		COMMENT="## ⚠ $WORKING_DIR gosec Failed
+		COMMENT="## ⚠ gosec failed ($MODULE_NAME)
 \`\`\`
 $(tail -n 6 result.txt)
 \`\`\`
@@ -202,7 +204,7 @@ check_shadow() {
 	fi
 
 	if [ "${SEND_COMMNET}" = "true" ]; then
-		COMMENT="## ⚠ $WORKING_DIR shadow Failed
+		COMMENT="## ⚠ shadow failed ($MODULE_NAME)
 \`\`\`
 ${OUTPUT}
 \`\`\`
@@ -222,7 +224,7 @@ check_staticcheck() {
 	fi
 
 	if [ "${SEND_COMMNET}" = "true" ]; then
-		COMMENT="## ⚠ $WORKING_DIR staticcheck Failed
+		COMMENT="## ⚠ staticcheck failed ($MODULE_NAME)
 \`\`\`
 ${OUTPUT}
 \`\`\`
@@ -244,7 +246,7 @@ check_vet() {
 	fi
 
 	if [ "${SEND_COMMNET}" = "true" ]; then
-		COMMENT="## ⚠ $WORKING_DIR vet Failed
+		COMMENT="## ⚠ vet failed ($MODULE_NAME)
 \`\`\`
 ${OUTPUT}
 \`\`\`
