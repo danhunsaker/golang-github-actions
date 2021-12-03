@@ -32,7 +32,13 @@ send_comment() {
 }
 
 setup_private_repo_access() {
-	git config --global "url.ssh://git@$GO_MOD_GOPRIVATE/.insteadOf" "https://$GO_MOD_GOPRIVATE/"
+	# setup access to go private modules via .netrc file
+	if [ "${GO_MOD_GOPRIVATE}" != "" ]; then
+		cat << EOF > .netrc
+machine github.com
+  login $GO_MOD_GH_USERNAME
+  password $GO_MOD_GH_TOKEN
+EOF
 
 	go env -w GOPRIVATE="${GO_MOD_GOPRIVATE}"
 	# check result status and report back
@@ -260,7 +266,7 @@ ${OUTPUT}
 # ------------------------
 cd ${GITHUB_WORKSPACE}/${WORKING_DIR}
 
-# setup_private_repo_access
+setup_private_repo_access
 
 case ${RUN} in
 	"errcheck" )
