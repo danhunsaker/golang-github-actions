@@ -72,7 +72,7 @@ check_errcheck() {
 	fi
 
 	if [ "${SEND_COMMNET}" = "true" ]; then
-		COMMENT="## ⚠ errcheck Failed
+		COMMENT="## ⚠ $WORKING_DIR errcheck Failed
 \`\`\`
 ${OUTPUT}
 \`\`\`
@@ -106,7 +106,7 @@ ${FILE_DIFF}
 
 "
 		done
-		COMMENT="## ⚠ gofmt Failed
+		COMMENT="## ⚠ $WORKING_DIR gofmt Failed
 ${FMT_OUTPUT}
 "
 	fi
@@ -138,7 +138,7 @@ ${FILE_DIFF}
 
 "
 		done
-		COMMENT="## ⚠ goimports Failed
+		COMMENT="## ⚠ $WORKING_DIR goimports Failed
 ${FMT_OUTPUT}
 "
 	fi
@@ -157,7 +157,7 @@ check_lint() {
 	fi
 
 	if [ "${SEND_COMMNET}" = "true" ]; then
-		COMMENT="## ⚠ golint Failed
+		COMMENT="## ⚠ $WORKING_DIR golint Failed
 $(echo "${OUTPUT}" | awk 'END{print}')
 <details><summary>Show Detail</summary>
 
@@ -181,7 +181,7 @@ check_sec() {
 	fi
 
 	if [ "${SEND_COMMNET}" = "true" ]; then
-		COMMENT="## ⚠ gosec Failed
+		COMMENT="## ⚠ $WORKING_DIR gosec Failed
 \`\`\`
 $(tail -n 6 result.txt)
 \`\`\`
@@ -209,7 +209,7 @@ check_shadow() {
 	fi
 
 	if [ "${SEND_COMMNET}" = "true" ]; then
-		COMMENT="## ⚠ shadow Failed
+		COMMENT="## ⚠ $WORKING_DIR shadow Failed
 \`\`\`
 ${OUTPUT}
 \`\`\`
@@ -229,7 +229,7 @@ check_staticcheck() {
 	fi
 
 	if [ "${SEND_COMMNET}" = "true" ]; then
-		COMMENT="## ⚠ staticcheck Failed
+		COMMENT="## ⚠ $WORKING_DIR staticcheck Failed
 \`\`\`
 ${OUTPUT}
 \`\`\`
@@ -251,7 +251,7 @@ check_vet() {
 	fi
 
 	if [ "${SEND_COMMNET}" = "true" ]; then
-		COMMENT="## ⚠ vet Failed
+		COMMENT="## ⚠ $WORKING_DIR vet Failed
 \`\`\`
 ${OUTPUT}
 \`\`\`
