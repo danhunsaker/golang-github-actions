@@ -4,17 +4,20 @@ set -e
 # ------------------------
 #  Environments
 # ------------------------
-RUN=$1
-WORKING_DIR=$2
-SEND_COMMNET=$3
-GITHUB_TOKEN=$4
-FLAGS=$5
-IGNORE_DEFER_ERR=$6
-GO_MOD_GH_USERNAME=$7
-GO_MOD_GH_TOKEN=$8
-GO_MOD_GOPRIVATE=$9
+self=${0}
+RUN=${1}
+WORKING_DIR=${2}
+SEND_COMMENT=${3}
+GITHUB_TOKEN=${4}
+FLAGS=${5}
+IGNORE_DEFER_ERR=${6}
+MAX_COMPLEXITY=${7}
+GO_PRIVATE_MOD_USERNAME=${8}
+GO_PRIVATE_MOD_PASSWORD=${9}
+GO_PRIVATE_MOD_ORG_PATH=${10}
 
-MODULE_NAME=`echo $WORKING_DIR | sed "s#./##g"`
+SUBMODULE_NAME=$(echo ${WORKING_DIR} | sed 's#\./##g')
+MODULE_NAME=$(echo "github.com/${GITHUB_REPOSITORY}/${SUBMODULE_NAME}" | sed 's#/\.?$##')
 
 COMMENT=""
 SUCCESS=0
@@ -27,46 +30,73 @@ SUCCESS=0
 # this function use ${GITHUB_TOKEN}, ${COMMENT} and ${GITHUB_EVENT_PATH}
 send_comment() {
 	PAYLOAD=$(echo '{}' | jq --arg body "${COMMENT}" '.body = $body')
-	COMMENTS_URL=$(cat ${GITHUB_EVENT_PATH} | jq -r .pull_request.comments_url)
+	if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+		COMMENTS_URL=$(cat ${GITHUB_EVENT_PATH} | jq -r .pull_request.comments_url)
+	else
+		SHA=$(cat ${GITHUB_EVENT_PATH} | jq -r .commits[0].id)
+		COMMENTS_URL=$(echo "$(cat ${GITHUB_EVENT_PATH} | jq -r .repository.commits_url)/comments" | sed -n 's#{/sha}#/'${SHA}'#p')
+	fi
 	curl -s -S -H "Authorization: token ${GITHUB_TOKEN}" --header "Content-Type: application/json" --data "${PAYLOAD}" "${COMMENTS_URL}" > /dev/null
 }
 
 setup_private_repo_access() {
 	# setup access to go private modules via .netrc file
-	if [ "${GO_MOD_GOPRIVATE}" != "" ]; then
+	if [ "${GO_PRIVATE_MOD_ORG_PATH}" != "" ]; then
 		cat << EOF > .netrc
-machine github.com
-  login $GO_MOD_GH_USERNAME
-  password $GO_MOD_GH_TOKEN
+machine $(echo ${GO_PRIVATE_MOD_ORG_PATH} | sed 's#/.*##')
+  login ${GO_PRIVATE_MOD_USERNAME}
+  password ${GO_PRIVATE_MOD_PASSWORD}
 EOF
 
-		git config --global "url.https://$GO_MOD_GH_USERNAME:$GO_MOD_GH_TOKEN@github.com/9count/.insteadOf" https://github.com/9count/
+		git config --global "url.https://${GO_PRIVATE_MOD_USERNAME}:${GO_PRIVATE_MOD_PASSWORD}@${GO_PRIVATE_MOD_ORG_PATH}/.insteadOf" https://${GO_PRIVATE_MOD_ORG_PATH}/
 
-		go env -w GOPRIVATE="${GO_MOD_GOPRIVATE}"
+		go env -w GOPRIVATE="${GO_PRIVATE_MOD_ORG_PATH}"
 		# check result status and report back
 		if [ $? != 0 ]; then
-				printf "\t\033[31mSetup go private repos for: ${GO_MOD_GOPRIVATE} \033[0m \033[0;30m\033[41mFAILURE!\033[0m\n"
+				printf "\t\033[31mSetup go private repos for: ${GO_PRIVATE_MOD_ORG_PATH} \033[0m \033[0;30m\033[41mFAILURE!\033[0m\n"
 		else
-				printf "\t\033[32mSetup go private repos for: ${GO_MOD_GOPRIVATE} \033[0m \033[0;30m\033[42mpass\033[0m\n"
+				printf "\t\033[32mSetup go private repos for: ${GO_PRIVATE_MOD_ORG_PATH} \033[0m \033[0;30m\033[42mpass\033[0m\n"
 		fi
 	fi
 }
 
 # mod_download is getting go modules using go.mod.
 mod_download() {
-	if [ ! -e go.mod ]; then go mod init; fi
+	if [ ! -e go.mod ]; then go mod init ${MODULE_NAME}; fi
 	go mod download
 	if [ $? -ne 0 ]; then exit 1; fi
 }
 
-# check_errcheck is excute "errcheck" and generate ${COMMENT} and ${SUCCESS}
+# check_cyclo executes gocyclo and generate ${COMMENT} and ${SUCCESS}
+check_cyclo() {
+	set +e
+	OUTPUT=$(sh -c "gocyclo -over ${MAX_COMPLEXITY} -avg -total ${FLAGS} . $*" 2>&1)
+	SUCCESS=$?
+
+	set -e
+	if [ ${SUCCESS} -eq 0 ]; then
+		return
+	fi
+
+	COMMENT="## ⚠ gocyclo failed (${SUBMODULE_NAME})
+$(echo "${OUTPUT}" | head -n-2 | wc -l) function(s) exceeding a complexity of ${MAX_COMPLEXITY}
+<details><summary>Show Detail</summary>
+
+\`\`\`
+${OUTPUT}
+\`\`\`
+</details>
+"
+}
+
+# check_errcheck executes "errcheck" and generate ${COMMENT} and ${SUCCESS}
 check_errcheck() {
 	if [ "${IGNORE_DEFER_ERR}" = "true" ]; then
 		IGNORE_COMMAND="| grep -v defer"
 	fi
 
 	set +e
-	OUTPUT=$(sh -c "errcheck ${FLAGS} ./... ${IGNORE_COMMAND} $*" 2>&1)
+	OUTPUT=$(sh -c "errcheck ${FLAGS} ./... $* ${IGNORE_COMMAND}" 2>&1)
 	test -z "${OUTPUT}"
 	SUCCESS=$?
 
@@ -75,16 +105,14 @@ check_errcheck() {
 		return
 	fi
 
-	if [ "${SEND_COMMNET}" = "true" ]; then
-		COMMENT="## ⚠ errcheck failed ($MODULE_NAME)
+	COMMENT="## ⚠ errcheck failed (${SUBMODULE_NAME})
 \`\`\`
 ${OUTPUT}
 \`\`\`
 "
-	fi
 }
 
-# check_fmt is excute "go fmt" and generate ${COMMENT} and ${SUCCESS}
+# check_fmt executes "go fmt" and generate ${COMMENT} and ${SUCCESS}
 check_fmt() {
 	set +e
 	UNFMT_FILES=$(sh -c "gofmt -l -s . $*" 2>&1)
@@ -96,11 +124,10 @@ check_fmt() {
 		return
 	fi
 
-	if [ "${SEND_COMMNET}" = "true" ]; then
-		FMT_OUTPUT=""
-		for file in ${UNFMT_FILES}; do
-			FILE_DIFF=$(gofmt -d -e "${file}" | sed -n '/@@.*/,//{/@@.*/d;p}')
-			FMT_OUTPUT="${FMT_OUTPUT}
+	FMT_OUTPUT=""
+	for file in ${UNFMT_FILES}; do
+		FILE_DIFF=$(gofmt -d -e "${file}" | sed -n '/@@.*/,//{/@@.*/d;p}')
+		FMT_OUTPUT="${FMT_OUTPUT}
 <details><summary><code>${file}</code></summary>
 
 \`\`\`diff
@@ -109,14 +136,13 @@ ${FILE_DIFF}
 </details>
 
 "
-		done
-		COMMENT="## ⚠ gofmt failed ($MODULE_NAME)
+	done
+	COMMENT="## ⚠ gofmt failed (${SUBMODULE_NAME})
 ${FMT_OUTPUT}
 "
-	fi
 }
 
-# check_imports is excute go imports and generate ${COMMENT} and ${SUCCESS}
+# check_imports executes go imports and generate ${COMMENT} and ${SUCCESS}
 check_imports() {
 	set +e
 	UNFMT_FILES=$(sh -c "goimports -l . $*" 2>&1)
@@ -128,11 +154,10 @@ check_imports() {
 		return
 	fi
 
-	if [ "${SEND_COMMNET}" = "true" ]; then
-		FMT_OUTPUT=""
-		for file in ${UNFMT_FILES}; do
-			FILE_DIFF=$(goimports -d -e "${file}" | sed -n '/@@.*/,//{/@@.*/d;p}')
-			FMT_OUTPUT="${FMT_OUTPUT}
+	FMT_OUTPUT=""
+	for file in ${UNFMT_FILES}; do
+		FILE_DIFF=$(goimports -d -e "${file}" | sed -n '/@@.*/,//{/@@.*/d;p}')
+		FMT_OUTPUT="${FMT_OUTPUT}
 <details><summary><code>${file}</code></summary>
 
 \`\`\`diff
@@ -141,15 +166,31 @@ ${FILE_DIFF}
 </details>
 
 "
-		done
-		COMMENT="## ⚠ goimports failed ($MODULE_NAME)
+	done
+	COMMENT="## ⚠ goimports failed (${SUBMODULE_NAME})
 ${FMT_OUTPUT}
 "
-	fi
-
 }
 
-# check_lint is excute golint and generate ${COMMENT} and ${SUCCESS}
+# check_ineffassign executes "ineffassign" and generate ${COMMENT} and ${SUCCESS}
+check_ineffassign() {
+	set +e
+	OUTPUT=$(sh -c "ineffassign ./... $*" 2>&1)
+	SUCCESS=$?
+
+	set -e
+	if [ ${SUCCESS} -eq 0 ]; then
+		return
+	fi
+
+	COMMENT="## ⚠ ineffassign failed (${SUBMODULE_NAME})
+\`\`\`
+${OUTPUT}
+\`\`\`
+"
+}
+
+# check_lint executes golint and generate ${COMMENT} and ${SUCCESS}
 check_lint() {
 	set +e
 	OUTPUT=$(sh -c "golint -set_exit_status ./... $*" 2>&1)
@@ -160,8 +201,7 @@ check_lint() {
 		return
 	fi
 
-	if [ "${SEND_COMMNET}" = "true" ]; then
-		COMMENT="## ⚠ golint failed ($MODULE_NAME)
+	COMMENT="## ⚠ golint failed (${SUBMODULE_NAME})
 $(echo "${OUTPUT}" | awk 'END{print}')
 <details><summary>Show Detail</summary>
 
@@ -170,13 +210,12 @@ $(echo "${OUTPUT}" | sed -e '$d')
 \`\`\`
 </details>
 "
-	fi
 }
 
-# check_sec is excute gosec and generate ${COMMENT} and ${SUCCESS}
-check_sec() {
+# check_misspelling executes "misspell" and generate ${COMMENT} and ${SUCCESS}
+check_misspelling() {
 	set +e
-	gosec -out result.txt ${FLAGS} ./...
+	OUTPUT=$(sh -c "misspell ${FLAGS} -error . $*" 2>&1)
 	SUCCESS=$?
 
 	set -e
@@ -184,8 +223,25 @@ check_sec() {
 		return
 	fi
 
-	if [ "${SEND_COMMNET}" = "true" ]; then
-		COMMENT="## ⚠ gosec failed ($MODULE_NAME)
+	COMMENT="## ⚠ misspell failed (${SUBMODULE_NAME})
+\`\`\`
+${OUTPUT}
+\`\`\`
+"
+}
+
+# check_sec executes gosec and generate ${COMMENT} and ${SUCCESS}
+check_sec() {
+	set +e
+	gosec -quiet ${FLAGS} ./... > result.txt 2>&1
+	SUCCESS=$?
+
+	set -e
+	if [ ${SUCCESS} -eq 0 ]; then
+		return
+	fi
+
+	COMMENT="## ⚠ gosec failed (${SUBMODULE_NAME})
 \`\`\`
 $(tail -n 6 result.txt)
 \`\`\`
@@ -198,13 +254,14 @@ $(cat result.txt)
 
 </details>
 "
-	fi
+
+	rm result.txt
 }
 
-# check_shadow is excute "go vet -vettool=/go/bin/shadow" and generate ${COMMENT} and ${SUCCESS}
+# check_shadow executes "go vet -vettool=/go/bin/shadow" and generate ${COMMENT} and ${SUCCESS}
 check_shadow() {
 	set +e
-	OUTPUT=$(sh -c "go vet -vettool=/go/bin/shadow ${FLAGS} ./... $*" 2>&1)
+	OUTPUT=$(sh -c "go vet -vettool=$(which shadow) ${FLAGS} ./... $*" 2>&1)
 	SUCCESS=$?
 
 	set -e
@@ -212,16 +269,14 @@ check_shadow() {
 		return
 	fi
 
-	if [ "${SEND_COMMNET}" = "true" ]; then
-		COMMENT="## ⚠ shadow failed ($MODULE_NAME)
+	COMMENT="## ⚠ shadow failed (${SUBMODULE_NAME})
 \`\`\`
 ${OUTPUT}
 \`\`\`
 "
-	fi
 }
 
-# check_staticcheck is excute "staticcheck" and generate ${COMMENT} and ${SUCCESS}
+# check_staticcheck executes "staticcheck" and generate ${COMMENT} and ${SUCCESS}
 check_staticcheck() {
 	set +e
 	OUTPUT=$(sh -c "staticcheck ${FLAGS} ./... $*" 2>&1)
@@ -232,18 +287,16 @@ check_staticcheck() {
 		return
 	fi
 
-	if [ "${SEND_COMMNET}" = "true" ]; then
-		COMMENT="## ⚠ staticcheck failed ($MODULE_NAME)
+	COMMENT="## ⚠ staticcheck failed (${SUBMODULE_NAME})
 \`\`\`
 ${OUTPUT}
 \`\`\`
 
 [Checks Document](https://staticcheck.io/docs/checks)
 "
-	fi
 }
 
-# check_vet is excute "go vet" and generate ${COMMENT} and ${SUCCESS}
+# check_vet executes "go vet" and generate ${COMMENT} and ${SUCCESS}
 check_vet() {
 	set +e
 	OUTPUT=$(sh -c "go vet ${FLAGS} ./... $*" 2>&1)
@@ -254,13 +307,11 @@ check_vet() {
 		return
 	fi
 
-	if [ "${SEND_COMMNET}" = "true" ]; then
-		COMMENT="## ⚠ vet failed ($MODULE_NAME)
+	COMMENT="## ⚠ vet failed (${SUBMODULE_NAME})
 \`\`\`
 ${OUTPUT}
 \`\`\`
 "
-	fi
 }
 
 
@@ -271,7 +322,14 @@ cd ${GITHUB_WORKSPACE}/${WORKING_DIR}
 
 setup_private_repo_access
 
+if [ ${RUN} = "all" ]; then
+	RUN="misspell,fmt,vet,cyclo,imports,ineffassign,errcheck,sec,shadow,staticcheck,lint"
+fi
+
 case ${RUN} in
+	"cyclo" )
+		check_cyclo
+		;;
 	"errcheck" )
 		mod_download
 		check_errcheck
@@ -282,8 +340,16 @@ case ${RUN} in
 	"imports" )
 		check_imports
 		;;
+	"ineffassign" )
+		mod_download
+		check_ineffassign
+		;;
 	"lint" )
 		check_lint
+		;;
+	"misspell" )
+		mod_download
+		check_misspelling
 		;;
 	"sec" )
 		mod_download
@@ -301,19 +367,33 @@ case ${RUN} in
 		mod_download
 		check_vet
 		;;
+	*,* )
+		set +e
+		checks=$(echo ${RUN} | sed 's/,/ /g')
+		for check in ${checks}; do
+			"${self}" "${check}" "${WORKING_DIR}" "${SEND_COMMENT}" "${GITHUB_TOKEN}" "${FLAGS}" "${IGNORE_DEFER_ERR}" "${MAX_COMPLEXITY}" "${GO_PRIVATE_MOD_USERNAME}" "${GO_PRIVATE_MOD_PASSWORD}" "${GO_PRIVATE_MOD_ORG_PATH}"
+			STATUS=$?
+			if [ ${STATUS} -ne 0 ]; then
+				# 0 on all success; last failed value on any failure
+				SUCCESS=${STATUS}
+				COMMENT="${COMMENT}- [ ] ${check}: fail\n"
+			else
+				COMMENT="${COMMENT}- [x] ${check}: success!\n"
+			fi
+		done
+		set -e
+		;;
 	* )
-		echo "Invalid command"
+		echo "Invalid command '${RUN}'"
 		exit 1
-
 esac
 
 if [ ${SUCCESS} -ne 0 ]; then
 	echo "Check Failed!!"
-	echo ${COMMENT}
-	if [ "${SEND_COMMNET}" = "true" ]; then
+	echo "${COMMENT}"
+	if [ "${SEND_COMMENT}" = "true" ]; then
 		send_comment
 	fi
 fi
 
 exit ${SUCCESS}
-

@@ -1,20 +1,20 @@
-name: "static analysis checker"
-description: "static code analysis checker for golang"
-author: "grandcolline"
+name: "Golang Static Analysis Checker"
+description: "A configurable static code analysis checker for Golang"
+author: "danhunsaker"
 inputs:
   run:
-    description: "excute command. [errcheck/fmt/imports/lint/sec/shadow/staticcheck/vet]"
+    description: "execute comma-separated command(s). [errcheck/fmt/imports/ineffassign/lint/misspell/sec/shadow/staticcheck/vet]"
     required: true
   directory:
-    description: "action wroking directory."
+    description: "action working directory."
     default: "."
     required: false
   comment:
-    description: "send comment to PR if true."
-    default: true
+    description: "send comment to PR (or commit) if true."
+    default: "true"
     required: false
   token:
-    description: "github token. this is require when comment is true."
+    description: "GitHub token. this is required when comment is true."
     default: ""
     required: false
   flags:
@@ -23,17 +23,21 @@ inputs:
     required: false
   ignore-defer:
     description: "if this is true, do not detect 'defer' with error. This is only valid when run is errcheck."
-    default: false
+    default: "false"
     required: false
-  go-mod-gh-username:
-    description: "github username for go dependencies from private repos. Must match the account token generated under"
+  max-complexity:
+    description: "the highest cyclomatic complexity to ignore with gocyclo"
+    default: "15"
+    required: false
+  go-private-mod-username:
+    description: "login username for go dependencies from private repos"
     default: ""
     required: false
-  go-mod-gh-token:
-    description: "github personal access token for go dependencies from private repos. Must match username account"
+  go-private-mod-password:
+    description: "password or GitHub personal access token for go dependencies from private repos"
     default: ""
     required: false
-  go-mod-goprivate:
+  go-private-mod-org-path:
     description: "git private organization url. eg. github.com/my-org"
     default: ""
     required: false
@@ -47,9 +51,10 @@ runs:
     - ${{ inputs.token }}
     - ${{ inputs.flags }}
     - ${{ inputs.ignore-defer }}
-    - ${{ inputs.go-mod-gh-username }}
-    - ${{ inputs.go-mod-gh-token }}
-    - ${{ inputs.go-mod-goprivate }}
+    - ${{ inputs.max-complexity }}
+    - ${{ inputs.go-private-mod-username }}
+    - ${{ inputs.go-private-mod-password }}
+    - ${{ inputs.go-private-mod-org-path }}
 branding:
   icon: "alert-triangle"
   color: "yellow"
