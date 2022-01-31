@@ -1,0 +1,15 @@
+name: Add WIP Label to new PRs
+on:
+  pull_request_target:
+
+jobs:
+  add-label:
+    name: Add Label
+    runs-on: ubuntu-latest
+    steps:
+      - uses: Bob-MYMC/add-labels@master
+        with:
+          labels: |
+            WIP
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
