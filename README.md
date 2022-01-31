@@ -32,6 +32,10 @@ resources that Go can't/won't clean automatically. Simply set this to `true` to 
 The highest cyclomatic complexity to consider "ok" with the `cyclo` check. The default of 15 was chosen to match [Go Report
 Card](https://goreportcard.com/)'s grading value.
 
+### exclude (default: empty)
+A list (comma-separated) of packages/paths to exclude from checks that support excludes. At the moment, that's just `cyclo` and `errcheck`. We're
+exploring mechanisms for extending this to the other checks, too, but this will take some time to implement correctly.
+
 ### go-private-mod-username (default: empty)
 Login username for getting Go dependencies from private repos.
 

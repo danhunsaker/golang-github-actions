@@ -29,6 +29,10 @@ inputs:
     description: "the highest cyclomatic complexity to ignore with gocyclo"
     default: "15"
     required: false
+  exclude:
+    description: "paths or packages to exclude from checks. Not well supported yet."
+    default: ""
+    required: false
   go-private-mod-username:
     description: "login username for go dependencies from private repos"
     default: ""
@@ -52,6 +56,7 @@ runs:
     - ${{ inputs.flags }}
     - ${{ inputs.ignore-defer }}
     - ${{ inputs.max-complexity }}
+    - ${{ inputs.exclude }}
     - ${{ inputs.go-private-mod-username }}
     - ${{ inputs.go-private-mod-password }}
     - ${{ inputs.go-private-mod-org-path }}

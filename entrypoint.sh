@@ -12,9 +12,10 @@ GITHUB_TOKEN=${4}
 FLAGS=${5}
 IGNORE_DEFER_ERR=${6}
 MAX_COMPLEXITY=${7}
-GO_PRIVATE_MOD_USERNAME=${8}
-GO_PRIVATE_MOD_PASSWORD=${9}
-GO_PRIVATE_MOD_ORG_PATH=${10}
+EXCLUDE=${8}
+GO_PRIVATE_MOD_USERNAME=${9}
+GO_PRIVATE_MOD_PASSWORD=${10}
+GO_PRIVATE_MOD_ORG_PATH=${11}
 
 SUBMODULE_NAME=$(echo ${WORKING_DIR} | sed 's#\./##g')
 MODULE_NAME=$(echo "github.com/${GITHUB_REPOSITORY}/${SUBMODULE_NAME}" | sed 's#/\.?$##')
@@ -69,6 +70,10 @@ mod_download() {
 
 # check_cyclo executes gocyclo and generate ${COMMENT} and ${SUCCESS}
 check_cyclo() {
+	if [ -n "${EXCLUDE}" ]; then
+		FLAGS="-ignore $(echo ${EXCLUDE} | tr , '|') ${FLAGS}"
+	fi
+
 	set +e
 	OUTPUT=$(sh -c "gocyclo -over ${MAX_COMPLEXITY} -avg -total ${FLAGS} . $*" 2>&1)
 	SUCCESS=$?
@@ -93,6 +98,10 @@ ${OUTPUT}
 check_errcheck() {
 	if [ "${IGNORE_DEFER_ERR}" = "true" ]; then
 		IGNORE_COMMAND="| grep -v defer"
+	fi
+
+	if [ -n "${EXCLUDE}" ]; then
+		FLAGS="-ignorepkg ${EXCLUDE} ${FLAGS}"
 	fi
 
 	set +e
@@ -372,7 +381,8 @@ case ${RUN} in
 		checks=$(echo ${RUN} | sed 's/,/ /g')
 		for check in ${checks}; do
 			COMMENT="${COMMENT}${check}: "
-			"${self}" "${check}" "${WORKING_DIR}" "${SEND_COMMENT}" "${GITHUB_TOKEN}" "${FLAGS}" "${IGNORE_DEFER_ERR}" "${MAX_COMPLEXITY}" "${GO_PRIVATE_MOD_USERNAME}" "${GO_PRIVATE_MOD_PASSWORD}" "${GO_PRIVATE_MOD_ORG_PATH}"
+			"${self}" "${check}" "${WORKING_DIR}" "${SEND_COMMENT}" "${GITHUB_TOKEN}" "${FLAGS}" "${IGNORE_DEFER_ERR}" "${MAX_COMPLEXITY}" "${EXCLUDE}" \
+				"${GO_PRIVATE_MOD_USERNAME}" "${GO_PRIVATE_MOD_PASSWORD}" "${GO_PRIVATE_MOD_ORG_PATH}"
 			STATUS=$?
 			if [ ${STATUS} -ne 0 ]; then
 				# 0 on all success; last failed value on any failure
