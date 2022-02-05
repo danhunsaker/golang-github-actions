@@ -9,7 +9,7 @@ RUN=${1}
 WORKING_DIR=${2}
 SEND_COMMENT=${3}
 GITHUB_TOKEN=${4}
-FLAGS=${5}
+FLAGS_RAW=${5}
 IGNORE_DEFER_ERR=${6}
 MAX_COMPLEXITY=${7}
 GO_PRIVATE_MOD_USERNAME=${8}
@@ -18,6 +18,24 @@ GO_PRIVATE_MOD_ORG_PATH=${10}
 
 SUBMODULE_NAME=$(echo ${WORKING_DIR} | sed 's#\./##g')
 MODULE_NAME=$(echo "github.com/${GITHUB_REPOSITORY}/${SUBMODULE_NAME}" | sed 's#/\.?$##')
+
+# If ${FLAGS_RAW} contains a valid JSON object, pull out the various check-specific options for use later
+if [ -n "$(echo ${FLAGS_RAW} | jq .[] 2>/dev/null)" ]; then
+	CYCLO_FLAGS=$(echo ${FLAGS_RAW} | jq -r .cyclo | sed 's/null//;/^$/D')
+	ERRCHECK_FLAGS=$(echo ${FLAGS_RAW} | jq -r .errcheck | sed 's/null//;/^$/D')
+	FMT_FLAGS=$(echo ${FLAGS_RAW} | jq -r .fmt | sed 's/null//;/^$/D')
+	IMPORTS_FLAGS=$(echo ${FLAGS_RAW} | jq -r .imports | sed 's/null//;/^$/D')
+	INEFFASSIGN_FLAGS=$(echo ${FLAGS_RAW} | jq -r .ineffassign | sed 's/null//;/^$/D')
+	LINT_FLAGS=$(echo ${FLAGS_RAW} | jq -r .lint | sed 's/null//;/^$/D')
+	MISSPELL_FLAGS=$(echo ${FLAGS_RAW} | jq -r .misspell | sed 's/null//;/^$/D')
+	SEC_FLAGS=$(echo ${FLAGS_RAW} | jq -r .sec | sed 's/null//;/^$/D')
+	SHADOW_FLAGS=$(echo ${FLAGS_RAW} | jq -r .shadow | sed 's/null//;/^$/D')
+	STATICCHECK_FLAGS=$(echo ${FLAGS_RAW} | jq -r .staticcheck | sed 's/null//;/^$/D')
+	VET_FLAGS=$(echo ${FLAGS_RAW} | jq -r .vet | sed 's/null//;/^$/D')
+	FLAGS=$(echo ${FLAGS_RAW} | jq -r .all | sed 's/null//;/^$/D')
+else
+	FLAGS=${FLAGS_RAW}
+fi
 
 COMMENT=""
 SUCCESS=0
@@ -29,7 +47,7 @@ SUCCESS=0
 # send_comment is send ${comment} to pull request.
 # this function use ${GITHUB_TOKEN}, ${COMMENT} and ${GITHUB_EVENT_PATH}
 send_comment() {
-	PAYLOAD=$(echo '{}' | jq --arg body "${COMMENT}" '.body = $body')
+	PAYLOAD=$(echo '{}' | jq --arg body "## ${COMMENT}" '.body = $body')
 	if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
 		COMMENTS_URL=$(cat ${GITHUB_EVENT_PATH} | jq -r .pull_request.comments_url)
 	else
@@ -70,7 +88,7 @@ mod_download() {
 # check_cyclo executes gocyclo and generate ${COMMENT} and ${SUCCESS}
 check_cyclo() {
 	set +e
-	OUTPUT=$(sh -c "gocyclo -over ${MAX_COMPLEXITY} -avg -total ${FLAGS} . $*" 2>&1)
+	OUTPUT=$(sh -c "gocyclo -over ${MAX_COMPLEXITY} -avg -total ${CYCLO_FLAGS} ${FLAGS} . $*" 2>&1)
 	SUCCESS=$?
 
 	set -e
@@ -78,7 +96,8 @@ check_cyclo() {
 		return
 	fi
 
-	COMMENT="## ⚠ gocyclo failed (${SUBMODULE_NAME})
+	# ${OUTPUT} is already sorted, so we don't need to do that ourselves
+	COMMENT="⚠ gocyclo failed (${SUBMODULE_NAME})
 $(echo "${OUTPUT}" | head -n-2 | wc -l) function(s) exceeding a complexity of ${MAX_COMPLEXITY}
 <details><summary>Show Detail</summary>
 
@@ -96,7 +115,7 @@ check_errcheck() {
 	fi
 
 	set +e
-	OUTPUT=$(sh -c "errcheck ${FLAGS} ./... $* ${IGNORE_COMMAND}" 2>&1)
+	OUTPUT=$(sh -c "errcheck ${ERRCHECK_FLAGS} ${FLAGS} ./... $* ${IGNORE_COMMAND}" 2>&1 | sort -Vu)
 	test -z "${OUTPUT}"
 	SUCCESS=$?
 
@@ -105,7 +124,7 @@ check_errcheck() {
 		return
 	fi
 
-	COMMENT="## ⚠ errcheck failed (${SUBMODULE_NAME})
+	COMMENT="⚠ errcheck failed (${SUBMODULE_NAME})
 \`\`\`
 ${OUTPUT}
 \`\`\`
@@ -115,7 +134,7 @@ ${OUTPUT}
 # check_fmt executes "go fmt" and generate ${COMMENT} and ${SUCCESS}
 check_fmt() {
 	set +e
-	UNFMT_FILES=$(sh -c "gofmt -l -s . $*" 2>&1)
+	UNFMT_FILES=$(sh -c "gofmt -l -s ${FMT_FLAGS} ${FLAGS} . $*" 2>&1 | sort -Vu)
 	test -z "${UNFMT_FILES}"
 	SUCCESS=$?
 
@@ -137,7 +156,7 @@ ${FILE_DIFF}
 
 "
 	done
-	COMMENT="## ⚠ gofmt failed (${SUBMODULE_NAME})
+	COMMENT="⚠ gofmt failed (${SUBMODULE_NAME})
 ${FMT_OUTPUT}
 "
 }
@@ -145,7 +164,7 @@ ${FMT_OUTPUT}
 # check_imports executes go imports and generate ${COMMENT} and ${SUCCESS}
 check_imports() {
 	set +e
-	UNFMT_FILES=$(sh -c "goimports -l . $*" 2>&1)
+	UNFMT_FILES=$(sh -c "goimports -l ${IMPORTS_FLAGS} ${FLAGS} . $*" 2>&1 | sort -Vu)
 	test -z "${UNFMT_FILES}"
 	SUCCESS=$?
 
@@ -167,7 +186,7 @@ ${FILE_DIFF}
 
 "
 	done
-	COMMENT="## ⚠ goimports failed (${SUBMODULE_NAME})
+	COMMENT="⚠ goimports failed (${SUBMODULE_NAME})
 ${FMT_OUTPUT}
 "
 }
@@ -175,7 +194,7 @@ ${FMT_OUTPUT}
 # check_ineffassign executes "ineffassign" and generate ${COMMENT} and ${SUCCESS}
 check_ineffassign() {
 	set +e
-	OUTPUT=$(sh -c "ineffassign ./... $*" 2>&1)
+	OUTPUT=$(sh -c "ineffassign ${INEFFASSIGN_FLAGS} ${FLAGS} ./... $*" 2>&1)
 	SUCCESS=$?
 
 	set -e
@@ -183,9 +202,9 @@ check_ineffassign() {
 		return
 	fi
 
-	COMMENT="## ⚠ ineffassign failed (${SUBMODULE_NAME})
+	COMMENT="⚠ ineffassign failed (${SUBMODULE_NAME})
 \`\`\`
-${OUTPUT}
+$(echo "${OUTPUT}" | sort -Vu)
 \`\`\`
 "
 }
@@ -193,7 +212,7 @@ ${OUTPUT}
 # check_lint executes golint and generate ${COMMENT} and ${SUCCESS}
 check_lint() {
 	set +e
-	OUTPUT=$(sh -c "golint -set_exit_status ./... $*" 2>&1)
+	OUTPUT=$(sh -c "golint -set_exit_status ${LINT_FLAGS} ${FLAGS} ./... $*" 2>&1)
 	SUCCESS=$?
 
 	set -e
@@ -201,12 +220,12 @@ check_lint() {
 		return
 	fi
 
-	COMMENT="## ⚠ golint failed (${SUBMODULE_NAME})
+	COMMENT="⚠ golint failed (${SUBMODULE_NAME})
 $(echo "${OUTPUT}" | awk 'END{print}')
 <details><summary>Show Detail</summary>
 
 \`\`\`
-$(echo "${OUTPUT}" | sed -e '$d')
+$(echo "${OUTPUT}" | sed -e '$d' | sort -Vu)
 \`\`\`
 </details>
 "
@@ -215,7 +234,7 @@ $(echo "${OUTPUT}" | sed -e '$d')
 # check_misspelling executes "misspell" and generate ${COMMENT} and ${SUCCESS}
 check_misspelling() {
 	set +e
-	OUTPUT=$(sh -c "misspell ${FLAGS} -error . $*" 2>&1)
+	OUTPUT=$(sh -c "misspell ${MISSPELL_FLAGS} ${FLAGS} -error . $*" 2>&1)
 	SUCCESS=$?
 
 	set -e
@@ -223,9 +242,9 @@ check_misspelling() {
 		return
 	fi
 
-	COMMENT="## ⚠ misspell failed (${SUBMODULE_NAME})
+	COMMENT="⚠ misspell failed (${SUBMODULE_NAME})
 \`\`\`
-${OUTPUT}
+$(echo "${OUTPUT}" | sort -Vu)
 \`\`\`
 "
 }
@@ -233,7 +252,7 @@ ${OUTPUT}
 # check_sec executes gosec and generate ${COMMENT} and ${SUCCESS}
 check_sec() {
 	set +e
-	gosec -quiet ${FLAGS} ./... > result.txt 2>&1
+	gosec -quiet ${SEC_FLAGS} ${FLAGS} ./... > result.txt 2>&1
 	SUCCESS=$?
 
 	set -e
@@ -241,18 +260,19 @@ check_sec() {
 		return
 	fi
 
-	COMMENT="## ⚠ gosec failed (${SUBMODULE_NAME})
+	# multi-line outputs - we have to group related lines and sort carefully
+	COMMENT="⚠ gosec failed (${SUBMODULE_NAME})
 \`\`\`
 $(tail -n 6 result.txt)
 \`\`\`
 <details><summary>Show Detail</summary>
 
 \`\`\`
-$(cat result.txt)
+$(head -n -6 result.txt | sed '/^$/N;s/^\n\+$/\x00/' | sort -zVu)
 \`\`\`
-[Code Reference](https://github.com/securego/gosec#available-rules)
-
 </details>
+
+[Code Reference](https://github.com/securego/gosec#available-rules)
 "
 
 	rm result.txt
@@ -261,7 +281,7 @@ $(cat result.txt)
 # check_shadow executes "go vet -vettool=/go/bin/shadow" and generate ${COMMENT} and ${SUCCESS}
 check_shadow() {
 	set +e
-	OUTPUT=$(sh -c "go vet -vettool=$(which shadow) ${FLAGS} ./... $*" 2>&1)
+	OUTPUT=$(sh -c "go vet -vettool=$(which shadow) ${SHADOW_FLAGS} ${FLAGS} ./... $*" 2>&1)
 	SUCCESS=$?
 
 	set -e
@@ -269,9 +289,9 @@ check_shadow() {
 		return
 	fi
 
-	COMMENT="## ⚠ shadow failed (${SUBMODULE_NAME})
+	COMMENT="⚠ shadow failed (${SUBMODULE_NAME})
 \`\`\`
-${OUTPUT}
+$(echo "${OUTPUT}" | grep -v '^#' | sort -Vu)
 \`\`\`
 "
 }
@@ -279,7 +299,7 @@ ${OUTPUT}
 # check_staticcheck executes "staticcheck" and generate ${COMMENT} and ${SUCCESS}
 check_staticcheck() {
 	set +e
-	OUTPUT=$(sh -c "staticcheck ${FLAGS} ./... $*" 2>&1)
+	OUTPUT=$(sh -c "staticcheck ${STATICCHECK_FLAGS} ${FLAGS} ./... $*" 2>&1)
 	SUCCESS=$?
 
 	set -e
@@ -287,9 +307,9 @@ check_staticcheck() {
 		return
 	fi
 
-	COMMENT="## ⚠ staticcheck failed (${SUBMODULE_NAME})
+	COMMENT="⚠ staticcheck failed (${SUBMODULE_NAME})
 \`\`\`
-${OUTPUT}
+$(echo "${OUTPUT}" | sort -Vu)
 \`\`\`
 
 [Checks Document](https://staticcheck.io/docs/checks)
@@ -299,7 +319,7 @@ ${OUTPUT}
 # check_vet executes "go vet" and generate ${COMMENT} and ${SUCCESS}
 check_vet() {
 	set +e
-	OUTPUT=$(sh -c "go vet ${FLAGS} ./... $*" 2>&1)
+	OUTPUT=$(sh -c "go vet ${VET_FLAGS} ${FLAGS} ./... $*" 2>&1)
 	SUCCESS=$?
 
 	set -e
@@ -307,9 +327,9 @@ check_vet() {
 		return
 	fi
 
-	COMMENT="## ⚠ vet failed (${SUBMODULE_NAME})
+	COMMENT="⚠ vet failed (${SUBMODULE_NAME})
 \`\`\`
-${OUTPUT}
+$(echo "${OUTPUT}" | sort -Vu)
 \`\`\`
 "
 }
@@ -368,10 +388,12 @@ case ${RUN} in
 		check_vet
 		;;
 	*,* )
+		# We can safely set ${COMMENT} to this because its value is only displayed if there's a failed check
+		COMMENT="⚠ Failure Summary\n"
 		set +e
 		checks=$(echo ${RUN} | sed 's/,/ /g')
 		for check in ${checks}; do
-			"${self}" "${check}" "${WORKING_DIR}" "${SEND_COMMENT}" "${GITHUB_TOKEN}" "${FLAGS}" "${IGNORE_DEFER_ERR}" "${MAX_COMPLEXITY}" "${GO_PRIVATE_MOD_USERNAME}" "${GO_PRIVATE_MOD_PASSWORD}" "${GO_PRIVATE_MOD_ORG_PATH}"
+			"${self}" "${check}" "${WORKING_DIR}" "${SEND_COMMENT}" "${GITHUB_TOKEN}" "${FLAGS_RAW}" "${IGNORE_DEFER_ERR}" "${MAX_COMPLEXITY}" "${GO_PRIVATE_MOD_USERNAME}" "${GO_PRIVATE_MOD_PASSWORD}" "${GO_PRIVATE_MOD_ORG_PATH}"
 			STATUS=$?
 			if [ ${STATUS} -ne 0 ]; then
 				# 0 on all success; last failed value on any failure
@@ -389,8 +411,10 @@ case ${RUN} in
 esac
 
 if [ ${SUCCESS} -ne 0 ]; then
-	echo "Check Failed!!"
-	echo "${COMMENT}"
+	echo "
+::group::${COMMENT}
+::end-group::
+"
 	if [ "${SEND_COMMENT}" = "true" ]; then
 		send_comment
 	fi

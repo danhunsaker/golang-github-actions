@@ -21,8 +21,10 @@ GitHub token (use `${{ secrets.GITHUB_TOKEN }}` for this, since it's automatical
 by default).
 
 ### flags (default: empty)
-Add flags to pass to the check commands. **Be careful with this option if you're running multiple checks, since these flags will be passed to _every_
-check command.**
+Add flags to pass to the check commands. For a single check, just use the raw flag(s) here, but for multiple checks (including `all`), this should be
+a JSON object whose keys are the check names, and whose values are the flag(s) for each specific check. If you _really_ want to pass a flag to _every_
+check, the `all` key is available, but **be careful, as most check commands will fail with unrecognized flags**. You can safely omit keys for checks
+with no flags. See the sample workflows below for an example.
 
 ### ignore-defer (default: `false`)
 By default, `errcheck` marks `defer` statements as problems. Of course, sometimes (usually?) you _want_ to `defer` certain logic, say for cleaning up
@@ -121,7 +123,9 @@ Runs `gocyclo` (and comments back on error).
 
 See [github.com/fzipp/gocyclo/cmd/gocyclo](https://github.com/fzipp/gocyclo) for more info.
 
-## Sample Workflow
+## Sample Workflows
+
+To run the `imports`, `errcheck`, `lint`, `shadow`, `staticcheck`, and `sec` checks in parallel:
 
 `.github/workflows/static.yml`
 
@@ -136,7 +140,7 @@ jobs:
     steps:
     - uses: actions/checkout@master
     - name: check
-      uses: grandcolline/golang-github-actions@v1.1.0
+      uses: danhunsaker/golang-github-actions@v1.3.0
       with:
         run: imports
         token: ${{ secrets.GITHUB_TOKEN }}
@@ -147,7 +151,7 @@ jobs:
     steps:
     - uses: actions/checkout@master
     - name: check
-      uses: grandcolline/golang-github-actions@v1.1.0
+      uses: danhunsaker/golang-github-actions@v1.3.0
       with:
         run: errcheck
         token: ${{ secrets.GITHUB_TOKEN }}
@@ -158,7 +162,7 @@ jobs:
     steps:
     - uses: actions/checkout@master
     - name: check
-      uses: grandcolline/golang-github-actions@v1.1.0
+      uses: danhunsaker/golang-github-actions@v1.3.0
       with:
         run: lint
         token: ${{ secrets.GITHUB_TOKEN }}
@@ -169,7 +173,7 @@ jobs:
     steps:
     - uses: actions/checkout@master
     - name: check
-      uses: grandcolline/golang-github-actions@v1.1.0
+      uses: danhunsaker/golang-github-actions@v1.3.0
       with:
         run: shadow
         token: ${{ secrets.GITHUB_TOKEN }}
@@ -180,7 +184,7 @@ jobs:
     steps:
     - uses: actions/checkout@master
     - name: check
-      uses: grandcolline/golang-github-actions@v1.1.0
+      uses: danhunsaker/golang-github-actions@v1.3.0
       with:
         run: staticcheck
         token: ${{ secrets.GITHUB_TOKEN }}
@@ -191,9 +195,31 @@ jobs:
     steps:
     - uses: actions/checkout@master
     - name: check
-      uses: grandcolline/golang-github-actions@v1.1.0
+      uses: danhunsaker/golang-github-actions@v1.3.0
       with:
         run: sec
         token: ${{ secrets.GITHUB_TOKEN }}
         flags: "-exclude=G104"
+```
+
+Or with the new multi-check feature (in serial):
+
+`.github/workflows/static-in-one.yml`
+
+```yaml
+name: static check in one go
+on: pull_request
+
+jobs:
+  in-one:
+    name: Imports
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: check
+      uses: danhunsaker/golang-github-actions@v1.3.0
+      with:
+        run: imports,errcheck,lint,shadow,staticcheck,sec
+        token: ${{ secrets.GITHUB_TOKEN }}
+        flags: '{"sec": "-exclude=G104"}'
 ```
