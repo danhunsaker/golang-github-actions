@@ -47,7 +47,7 @@ SUCCESS=0
 # send_comment is send ${comment} to pull request.
 # this function use ${GITHUB_TOKEN}, ${COMMENT} and ${GITHUB_EVENT_PATH}
 send_comment() {
-	PAYLOAD=$(echo '{}' | jq --arg body "## ${COMMENT}" '.body = $body')
+	PAYLOAD=$(echo '{}' | jq --arg body "$(echo "## ${COMMENT}")" '.body = $body')
 	if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
 		COMMENTS_URL=$(cat ${GITHUB_EVENT_PATH} | jq -r .pull_request.comments_url)
 	else
@@ -413,7 +413,7 @@ esac
 if [ ${SUCCESS} -ne 0 ]; then
 	echo "
 ::group::${COMMENT}
-::end-group::
+::endgroup::
 "
 	if [ "${SEND_COMMENT}" = "true" ]; then
 		send_comment
