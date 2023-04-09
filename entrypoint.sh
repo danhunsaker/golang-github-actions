@@ -88,7 +88,7 @@ mod_download() {
 # check_cyclo executes gocyclo and generate ${COMMENT} and ${SUCCESS}
 check_cyclo() {
 	set +e
-	OUTPUT=$(sh -c "gocyclo -over ${MAX_COMPLEXITY} -avg -total ${CYCLO_FLAGS} ${FLAGS} . $*" 2>&1)
+	OUTPUT=$(sh -c "gocyclo -over ${MAX_COMPLEXITY} -avg ${CYCLO_FLAGS} ${FLAGS} . $*" 2>&1)
 	SUCCESS=$?
 
 	set -e
@@ -98,7 +98,7 @@ check_cyclo() {
 
 	# ${OUTPUT} is already sorted, so we don't need to do that ourselves
 	COMMENT="⚠ gocyclo failed (${SUBMODULE_NAME})
-$(echo "${OUTPUT}" | head -n-2 | wc -l) function(s) exceeding a complexity of ${MAX_COMPLEXITY}
+$(echo "${OUTPUT}" | head -n-1 | wc -l) function(s) exceeding a complexity of ${MAX_COMPLEXITY}
 <details><summary>Show Detail</summary>
 
 \`\`\`
